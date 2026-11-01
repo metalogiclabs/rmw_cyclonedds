@@ -51,9 +51,14 @@ jobs:
               export EXPECTED_LIB_DIR=/tmp/nested-install/lib
               export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
               ulimit -t 30
+              set +e
               /usr/bin/python3 /source/research_tests/nested_sequence_preflight.py \
                 > /evidence/result.json 2> /evidence/stderr.txt
+              rc=$?
+              set -e
               cat /evidence/result.json
+              cat /evidence/stderr.txt
+              exit "$rc"
             '
       - name: Preserve outcome, including failed assertions
         if: always()
