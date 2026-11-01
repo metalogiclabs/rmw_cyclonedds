@@ -1,0 +1,37 @@
+name: Cyclone Jazzy source-native peak RSS preflight differential
+on:
+  push:
+    branches: [research/jazzy-cdr-peak-rss-20261102]
+    paths:
+      - .github/workflows/cyclone-jazzy-peak-rss.yml
+      - research_tests/jazzy_peak_rss.py
+      - research_tests/jazzy_peak_rss_check.py
+      - research_tests/run_jazzy_peak_rss.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bounded-peak-rss:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pin source, runner, and container
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/run-commit.txt
+          git rev-parse HEAD:rmw_cyclonedds_cpp/src/TypeSupport_impl.hpp > evidence/typesupport-blob.txt
+          git rev-parse HEAD:rmw_cyclonedds_cpp/src/serdes.hpp > evidence/serdes-blob.txt
+          docker pull ros:jazzy-ros-base
+          docker inspect --format '{{.Id}}' ros:jazzy-ros-base > evidence/container-id.txt
+      - name: Build both pinned native libraries and collect bounded wait4 RSS
+        run: |
+          docker run --rm --memory=2g --memory-swap=2g --ulimit core=0 \
+            -v "$PWD:/source:ro" -v "$PWD/evidence:/evidence" \
+            ros:jazzy-ros-base bash /source/research_tests/run_jazzy_peak_rss.sh
+      - name: Preserve source fingerprints and raw trials even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyclone-jazzy-bounded-peak-rss
+          path: evidence/
