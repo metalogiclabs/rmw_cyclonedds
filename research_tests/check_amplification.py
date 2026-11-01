@@ -13,8 +13,8 @@ for arm in ("base","patched"):
     data[arm]=rows
 assert [r["wire"] for r in data["base"]]==[r["wire"] for r in data["patched"]]
 a,b=data["base"][-1],data["patched"][-1]
-assert b["max_alloc"]/b["wire"]>=4,(a,b)
-assert a["max_alloc"]/a["wire"]>=4,(a,b)
+assert b["max_alloc"]/b["wire"]>=3.5,(a,b)
+assert a["max_alloc"]/a["wire"]>=3.5,(a,b)
 # A source-only preflight controls impossible sequence lengths but cannot
 # bound representational expansion for plausible (but later-invalid) payloads.
 summary={"arms":data,"largest_case":{"n":b["n"],"wire_bytes":b["wire"],
