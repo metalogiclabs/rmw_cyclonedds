@@ -221,10 +221,28 @@ public:
     for (size_t i = 0; i < cnt; i++) {deserialize(x[i]);}
   }
 
+  // Minimum bytes required for each element on the CDR wire, before
+  // allocating a vector.  Builtin scalar types have a fixed wire width.
+  // Strings start with a four-byte length field; complex elements retain
+  // the existing conservative lower bound of one byte.
+  template<class T>
+  inline static size_t min_serialized_element_size(const T *)
+  {
+    return std::is_arithmetic<T>::value ? sizeof(T) : 1;
+  }
+  inline static size_t min_serialized_element_size(const std::string *)
+  {
+    return sizeof(uint32_t);
+  }
+  inline static size_t min_serialized_element_size(const std::wstring *)
+  {
+    return sizeof(uint32_t);
+  }
+
   template<class T>
   inline void deserialize(std::vector<T> & x)
   {
-    const uint32_t sz = deserialize_len(1);
+    const uint32_t sz = deserialize_len(min_serialized_element_size(static_cast<T *>(nullptr)));
     x.resize(sz);
     deserializeA(x.data(), sz);
   }
