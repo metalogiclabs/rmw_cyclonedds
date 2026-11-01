@@ -1,0 +1,87 @@
+name: Cyclone combined CDR guards release-branch compatibility
+on:
+  push:
+    branches:
+      - research/jazzy-cdr-nested-minwire-20261102
+    paths:
+      - .github/workflows/cyclone-release-compatibility.yml
+      - rmw_cyclonedds_cpp/src/serdes.hpp
+      - rmw_cyclonedds_cpp/src/TypeSupport_impl.hpp
+      - research_tests/nested_sequence_preflight.py
+      - research_tests/combined_native_smoke.py
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        distro: [humble, jazzy, kilted]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Source fingerprint and exact patch
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/research-head.txt
+          git diff 20b192ae744f2fe56767e68081a46ad0d7f7a0ec HEAD -- \
+            rmw_cyclonedds_cpp/src/serdes.hpp \
+            rmw_cyclonedds_cpp/src/TypeSupport_impl.hpp > evidence/guards.patch
+          test -s evidence/guards.patch
+          sha256sum evidence/guards.patch > evidence/guards.patch.sha256
+          docker pull ros:${{ matrix.distro }}-ros-base
+          docker inspect --format '{{.Id}}' ros:${{ matrix.distro }}-ros-base > evidence/container-id.txt
+      - name: Apply exact guarded patch, build native RMW, and run bounded controls
+        run: |
+          docker run --rm --memory=2g --memory-swap=2g --ulimit core=0 \
+            -e ROS_DISTRO=${{ matrix.distro }} \
+            -v "$PWD:/source:ro" -v "$PWD/evidence:/evidence" \
+            ros:${{ matrix.distro }}-ros-base bash -ec '
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update -qq
+              apt-get install -y -qq git g++ cmake ninja-build python3-colcon-common-extensions \
+                "ros-$ROS_DISTRO-rmw-cyclonedds-cpp" "ros-$ROS_DISTRO-test-msgs"
+              set +u
+              source "/opt/ros/$ROS_DISTRO/setup.bash"
+              set -u
+              dpkg-query -W "ros-$ROS_DISTRO-rmw-cyclonedds-cpp" \
+                "ros-$ROS_DISTRO-test-msgs" "ros-$ROS_DISTRO-rclpy" \
+                > /evidence/packages.txt
+              git clone -q --depth=1 --branch "$ROS_DISTRO" \
+                https://github.com/ros2/rmw_cyclonedds.git /tmp/release
+              git -C /tmp/release rev-parse HEAD > /evidence/upstream-sha.txt
+              git -C /tmp/release apply --check /evidence/guards.patch
+              git -C /tmp/release apply /evidence/guards.patch
+              git -C /tmp/release diff --check
+              colcon --log-base /tmp/release-logs build \
+                --merge-install --base-paths /tmp/release/rmw_cyclonedds_cpp \
+                --packages-select rmw_cyclonedds_cpp \
+                --build-base /tmp/release-build \
+                --install-base /tmp/release-install \
+                --event-handlers console_cohesion+ \
+                --cmake-args -DBUILD_TESTING=OFF \
+                > /evidence/colcon-build.log 2>&1
+              test -f /tmp/release-install/lib/librmw_cyclonedds_cpp.so
+              sha256sum /tmp/release-install/lib/librmw_cyclonedds_cpp.so \
+                > /evidence/library.sha256
+              export LD_LIBRARY_PATH="/tmp/release-install/lib:$LD_LIBRARY_PATH"
+              export EXPECTED_LIB_DIR=/tmp/release-install/lib
+              export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+              ulimit -t 30
+              /usr/bin/python3 /source/research_tests/nested_sequence_preflight.py \
+                > /evidence/nested.json 2> /evidence/nested.stderr
+              cat /evidence/nested.json
+              /usr/bin/python3 /source/research_tests/combined_native_smoke.py \
+                > /evidence/combined.json 2> /evidence/combined.stderr
+              cat /evidence/combined.json
+            '
+      - name: Preserve compatibility evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyclone-combined-${{ matrix.distro }}
+          path: evidence/
