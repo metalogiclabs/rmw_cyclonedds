@@ -151,7 +151,9 @@ inline void deserialize_field<std::wstring>(
     if (member->array_size_ && !member->is_upper_bound_) {
       size = static_cast<uint32_t>(member->array_size_);
     } else {
-      deser >> size;
+      // Check the minimum four-byte length field of each serialized wstring
+      // before allocating the destination sequence.
+      size = deser.deserialize_len(sizeof(uint32_t));
       resize_field(member, field, size);
     }
     for (size_t i = 0; i < size; ++i) {
@@ -175,8 +177,9 @@ void deserialize_field(
     deser.deserializeA(static_cast<T *>(field), member->array_size_);
   } else {
     auto & data = *reinterpret_cast<typename GenericCSequence<T>::type *>(field);
-    int32_t dsize = 0;
-    deser >> dsize;
+    // The serialized payload must contain at least one T per sequence item.
+    // Reject impossible lengths before allocating the C sequence.
+    const uint32_t dsize = deser.deserialize_len(sizeof(T));
     if (!GenericCSequence<T>::init(&data, dsize)) {
       throw std::runtime_error("unable initialize generic sequence");
     }
@@ -247,8 +250,8 @@ inline void deserialize_field<std::wstring>(
       wstring_to_u16string(wstr, array[i]);
     }
   } else {
-    uint32_t size;
-    deser >> size;
+    // Each encoded wstring has a minimum four-byte length field.
+    const uint32_t size = deser.deserialize_len(sizeof(uint32_t));
     auto sequence = static_cast<rosidl_runtime_c__U16String__Sequence *>(field);
     if (!rosidl_runtime_c__U16String__Sequence__init(sequence, size)) {
       throw std::runtime_error("unable to initialize rosidl_runtime_c__U16String sequence");
