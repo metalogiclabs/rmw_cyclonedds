@@ -28,7 +28,7 @@ colcon --log-base /tmp/probe-logs build \
   --install-base /tmp/probe-install \
   --event-handlers console_cohesion+ \
   --cmake-args -DBUILD_TESTING=OFF > /evidence/cpp-probe-build.log 2>&1
-app=/tmp/probe-install/lib/mathgraph_cyclone_cpp_witness/ros_cpp_real_path
+app=/tmp/probe-install/mathgraph_cyclone_cpp_witness/lib/mathgraph_cyclone_cpp_witness/ros_cpp_real_path
 test -x "$app"
 sha256sum "$app" > /evidence/cpp-probe-binary.sha256
 
