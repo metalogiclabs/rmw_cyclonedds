@@ -38,6 +38,7 @@ jobs:
               dpkg-query -W ros-jazzy-rmw-cyclonedds-cpp \
                 ros-jazzy-ament-lint-auto ros-jazzy-ament-lint-common \
                 > /evidence/packages.txt
+              cd /source
               colcon --log-base /tmp/lint-build-logs build \
                 --merge-install --base-paths /source/rmw_cyclonedds_cpp \
                 --packages-select rmw_cyclonedds_cpp \
