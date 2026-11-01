@@ -51,7 +51,10 @@ bool malformed(const char* name) {
   std::cout << name << " refused=" << refused
             << " peak_requested_new=" << largest_new
             << " input_bytes=" << bytes.size() << std::endl;
-  return refused;
+  // The failed decode must not request a destination allocation larger
+  // than the input representation. This also distinguishes the old bug
+  // (256 or 1024 bytes) from the corrected preflight.
+  return refused && largest_new < 128;
 }
 
 bool valid_uint64() {
