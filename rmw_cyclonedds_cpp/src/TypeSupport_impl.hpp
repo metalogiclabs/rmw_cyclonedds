@@ -18,6 +18,7 @@
 
 #include <cassert>
 #include <functional>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -263,6 +264,73 @@ inline void deserialize_field<std::wstring>(
   }
 }
 
+// Conservative CDR wire-size lower bound. Alignment only adds bytes, and
+// dynamic sequences can be empty, so neither padding nor dynamic elements
+// contribute to this minimum. Saturation keeps malformed type metadata from
+// wrapping the bound.
+inline size_t minwire_add(size_t a, size_t b)
+{
+  const auto max = std::numeric_limits<size_t>::max();
+  return b > max - a ? max : a + b;
+}
+
+inline size_t minwire_multiply(size_t a, size_t b)
+{
+  const auto max = std::numeric_limits<size_t>::max();
+  return a != 0 && b > max / a ? max : a * b;
+}
+
+template<typename MembersType>
+size_t min_serialized_message_bytes(const MembersType * members)
+{
+  // Empty ROS messages are carried by a one-byte dummy field.
+  if (members->member_count_ == 0) {
+    return 1;
+  }
+
+  size_t minimum = 0;
+  for (uint32_t i = 0; i < members->member_count_; ++i) {
+    const auto & member = members->members_[i];
+    size_t element = 1;
+    switch (member.type_id_) {
+      case rosidl_typesupport_introspection_cpp::ROS_TYPE_INT16:
+      case rosidl_typesupport_introspection_cpp::ROS_TYPE_UINT16:
+        element = 2;
+        break;
+      case rosidl_typesupport_introspection_cpp::ROS_TYPE_FLOAT32:
+      case rosidl_typesupport_introspection_cpp::ROS_TYPE_INT32:
+      case rosidl_typesupport_introspection_cpp::ROS_TYPE_UINT32:
+      case rosidl_typesupport_introspection_cpp::ROS_TYPE_STRING:
+      case rosidl_typesupport_introspection_cpp::ROS_TYPE_WSTRING:
+        element = 4;
+        break;
+      case rosidl_typesupport_introspection_cpp::ROS_TYPE_FLOAT64:
+      case rosidl_typesupport_introspection_cpp::ROS_TYPE_INT64:
+      case rosidl_typesupport_introspection_cpp::ROS_TYPE_UINT64:
+        element = 8;
+        break;
+      case rosidl_typesupport_introspection_cpp::ROS_TYPE_MESSAGE:
+        element = min_serialized_message_bytes(
+          static_cast<const MembersType *>(member.members_->data));
+        break;
+      default:
+        // bool, byte, char, int8, uint8, and unknown types: one byte.
+        break;
+    }
+
+    if (member.is_array_) {
+      if (member.array_size_ != 0 && !member.is_upper_bound_) {
+        element = minwire_multiply(element, member.array_size_);
+      } else {
+        // A variable-length array always has a four-byte element count.
+        element = sizeof(uint32_t);
+      }
+    }
+    minimum = minwire_add(minimum, element);
+  }
+  return minimum;
+}
+
 template<typename MembersType>
 bool TypeSupport<MembersType>::deserializeROSmessage(
   cycdeser & deser, const MembersType * members, void * ros_message)
@@ -326,7 +394,8 @@ bool TypeSupport<MembersType>::deserializeROSmessage(
             if (member->array_size_ && !member->is_upper_bound_) {
               array_size = member->array_size_;
             } else {
-              array_size = deser.deserialize_len(1);
+              const size_t minimum_element_bytes = min_serialized_message_bytes(sub_members);
+              array_size = deser.deserialize_len_minimum(minimum_element_bytes);
               resize_field(member, field, array_size);
             }
 
