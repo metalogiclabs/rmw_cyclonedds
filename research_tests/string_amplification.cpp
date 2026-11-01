@@ -49,8 +49,14 @@ int main() {
     const auto & raw=serialized.get_rcl_serialized_message();
     const std::size_t length=raw.buffer_length;
     if(length<=8) return 2;
+    // Use identical allocation instrumentation for a fully valid decode.
+    // This is a control for in-memory representation expansion, not a fault.
     Msg valid_out;
+    max_requested=0;
+    monitoring=true;
     coder.deserialize_message(&serialized,&valid_out);
+    monitoring=false;
+    const std::size_t valid_max_requested=max_requested;
     const bool valid=valid_out.string_values==input.string_values;
     // The string sequence is complete. Remove the final scalar field so the
     // message is malformed only AFTER the sequence allocation happens.
@@ -71,11 +77,13 @@ int main() {
     monitoring=false;
     std::cout << "CASE n=" << n << " wire=" << broken_len
               << " max_alloc=" << max_requested
+              << " max_valid_alloc=" << valid_max_requested
               << " rejected=" << rejected
               << " valid=" << valid
               << " string_object_bytes=" << sizeof(std::string)
               << std::endl;
-    all &= rejected && valid && max_requested >= n*sizeof(std::string);
+    all &= rejected && valid && max_requested >= n*sizeof(std::string)
+      && valid_max_requested >= n*sizeof(std::string);
   }
   const char *expected=std::getenv("EXPECTED_LIB_DIR");
   if(!expected) return 3;
