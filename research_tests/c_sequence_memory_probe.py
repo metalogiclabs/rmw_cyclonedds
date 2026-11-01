@@ -2,10 +2,15 @@
 """Bounded, actual rmw_cyclonedds Jazzy malformed-sequence allocation check."""
 import json, os, resource, struct, sys
 from rclpy.serialization import serialize_message, deserialize_message
+from test_msgs import msg as test_msgs
 from test_msgs.msg import UnboundedSequences
 
-valid=serialize_message(UnboundedSequences())
-assert type(deserialize_message(valid,UnboundedSequences)) is UnboundedSequences
+positive_types = ("Arrays", "Strings", "BoundedSequences",
+                  "UnboundedSequences", "MultiNested", "WStrings", "BasicTypes")
+for name in positive_types:
+    cls = getattr(test_msgs, name)
+    valid = serialize_message(cls())
+    assert type(deserialize_message(valid, cls)) is cls, name
 loaded=sorted({s.split()[-1] for s in open("/proc/self/maps")
                 if "librmw_cyclonedds_cpp.so" in s and "/" in s})
 assert loaded and all(p.startswith(os.environ["EXPECTED_LIB_DIR"]) for p in loaded), loaded
@@ -35,6 +40,6 @@ result={"arm":os.environ["ARM"],"case":"float64_C_sequence_truncated",
         "input_bytes":len(data),"declared_elements":size,
         "status":status,"error_message":error_message,"vm_limit_bytes":limit_bytes,"peak_rss_kb_before":before,"peak_rss_kb_after":after,
         "peak_delta_kb":after-before,"loaded_libraries":loaded,
-        "positive_control":"pass"}
+        "positive_control":"7/7 passed"}
 print(json.dumps(result,sort_keys=True),flush=True)
 assert status in ("RMWError", "RuntimeError"),result
