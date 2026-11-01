@@ -1,0 +1,36 @@
+name: Jazzy C sequence preflight bounded native comparison
+on:
+  push:
+    branches:
+      - research/jazzy-cdr-allocation-boundary-20261102
+    paths:
+      - .github/workflows/cyclone-c-sequence-comparison.yml
+      - research_tests/run_c_sequence_comparison.sh
+      - research_tests/c_sequence_memory_probe.py
+      - research_tests/check_c_sequence_memory.py
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-comparison:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Capture Git SHA and container
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/experiment-head.txt
+          docker pull ros:jazzy-ros-base
+          docker inspect --format '{{.Id}}' ros:jazzy-ros-base > evidence/container-id.txt
+      - name: Build both ROS source arms and compare bounded allocation behavior
+        run: |
+          docker run --rm --memory=2g --memory-swap=2g --ulimit core=0 \
+            -v "$PWD:/source:ro" -v "$PWD/evidence:/evidence" \
+            ros:jazzy-ros-base bash /source/research_tests/run_c_sequence_comparison.sh
+      - name: Archive positive and negative evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyclone-jazzy-c-sequence-allocation-comparison
+          path: evidence/
