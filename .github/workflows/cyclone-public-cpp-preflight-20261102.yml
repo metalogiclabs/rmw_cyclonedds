@@ -1,0 +1,34 @@
+name: Cyclone DDS native public C++ serialization allocation comparison
+on:
+  push:
+    branches: [research/jazzy-cpp-vector-preflight-20261102]
+    paths:
+      - .github/workflows/cyclone-public-cpp-preflight-20261102.yml
+      - research_tests/ros_cpp_real_path.cpp
+      - research_tests/ros_cpp_witness/**
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pin research revision and container
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/research-commit.txt
+          docker pull ros:jazzy-ros-base
+          docker inspect --format '{{.Id}}' ros:jazzy-ros-base > evidence/container-image.txt
+      - name: Build native ROS 2 C++ app and exact baseline/guard Cyclone DDS libraries
+        run: |
+          docker run --rm --ulimit core=0 --memory=3g --memory-swap=3g \
+            -v "$PWD:/source:ro" -v "$PWD/evidence:/evidence" \
+            ros:jazzy-ros-base bash /source/research_tests/ros_cpp_witness/run_native.sh
+      - name: Archive evidence even if test cannot reach the target
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyclone-cpp-public-api-preflight-evidence
+          path: evidence/
