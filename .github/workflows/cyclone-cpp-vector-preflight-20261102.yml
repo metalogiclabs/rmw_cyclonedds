@@ -1,0 +1,41 @@
+name: Native bounded Cyclone C++ vector preflight differential
+on:
+  push:
+    branches:
+      - research/jazzy-cpp-vector-preflight-20261102
+    paths:
+      - .github/workflows/cyclone-cpp-vector-preflight-20261102.yml
+      - research_tests/cpp_vector_preflight.cpp
+      - research_tests/run_cpp_vector_preflight.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bounded-cpp:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Capture pinned source and ROS image
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/experiment-sha.txt
+          docker pull ros:jazzy-ros-base
+          docker inspect --format '{{.Id}}' ros:jazzy-ros-base > evidence/ros-image.txt
+      - name: Build test image with ROS Cyclone headers
+        run: |
+          printf '%s\n' 'FROM ros:jazzy-ros-base' \
+            'RUN apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq g++ python3 ros-jazzy-rmw-cyclonedds-cpp' \
+            > /tmp/Dockerfile-cyclone
+          docker build -q -f /tmp/Dockerfile-cyclone -t cyclone-cpp-native . > evidence/test-image.txt
+      - name: Run native baseline and source-only guard in resource sandbox
+        run: |
+          docker run --rm --network=none --memory=512m --memory-swap=512m --pids-limit=64 --ulimit core=0 \
+            -v "$PWD:/source:ro" -v "$PWD/evidence:/evidence" \
+            cyclone-cpp-native bash /source/research_tests/run_cpp_vector_preflight.sh
+      - name: Preserve evidence including negative results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyclone-cpp-vector-bounded-evidence
+          path: evidence/
