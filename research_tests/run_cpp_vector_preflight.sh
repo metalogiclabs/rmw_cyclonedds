@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+git config --global --add safe.directory /source
 src=/source/rmw_cyclonedds_cpp/src
 head_root=$(find /opt/ros/jazzy/include -path '*/dds/ddsrt/endian.h' -print -quit)
 test -n "$head_root"
