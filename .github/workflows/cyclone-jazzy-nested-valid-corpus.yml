@@ -1,0 +1,52 @@
+name: Cyclone Jazzy recursive minimum valid nested corpus
+on:
+  push:
+    branches: [research/jazzy-nested-valid-corpus-20261102]
+    paths:
+      - .github/workflows/cyclone-jazzy-nested-valid-corpus.yml
+      - research_tests/jazzy_nested_valid_corpus.py
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-native-corpus:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pin exact source and container
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/experiment-commit.txt
+          git rev-parse HEAD:rmw_cyclonedds_cpp/src/TypeSupport_impl.hpp > evidence/typesupport-blob.txt
+          git rev-parse HEAD:rmw_cyclonedds_cpp/src/serdes.hpp > evidence/serdes-blob.txt
+          docker pull ros:jazzy-ros-base
+          docker inspect --format '{{.Id}}' ros:jazzy-ros-base > evidence/container-id.txt
+      - name: Source-build exact candidate and exercise nested positive controls
+        run: |
+          docker run --rm --memory=2g --memory-swap=2g --ulimit core=0 \
+            -v "$PWD:/source:ro" -v "$PWD/evidence:/evidence" \
+            ros:jazzy-ros-base bash -e -c '
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update -qq
+              apt-get install -y -qq g++ cmake ninja-build python3-colcon-common-extensions ros-jazzy-test-msgs ros-jazzy-rmw-cyclonedds-cpp
+              source /opt/ros/jazzy/setup.bash
+              dpkg-query -W ros-jazzy-rmw-cyclonedds-cpp ros-jazzy-test-msgs ros-jazzy-rclpy > /evidence/packages.txt
+              colcon --log-base /tmp/nested-corpus-log build --merge-install \
+                --base-paths /source/rmw_cyclonedds_cpp --packages-select rmw_cyclonedds_cpp \
+                --build-base /tmp/nested-corpus-build --install-base /tmp/nested-corpus-install \
+                --event-handlers console_cohesion+ --cmake-args -DBUILD_TESTING=OFF \
+                > /evidence/build.log 2>&1
+              sha256sum /tmp/nested-corpus-install/lib/librmw_cyclonedds_cpp.so > /evidence/library.sha256
+              export LD_LIBRARY_PATH="/tmp/nested-corpus-install/lib:$LD_LIBRARY_PATH"
+              export EXPECTED_LIB_DIR=/tmp/nested-corpus-install/lib
+              export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+              /usr/bin/python3 /source/research_tests/jazzy_nested_valid_corpus.py > /evidence/console.txt 2> /evidence/stderr.txt
+              cat /evidence/console.txt
+            '
+      - name: Preserve corpus and failure artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyclone-jazzy-nested-valid-corpus-evidence
+          path: evidence/
