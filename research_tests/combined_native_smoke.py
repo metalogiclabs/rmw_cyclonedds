@@ -33,7 +33,7 @@ try:
 except Exception as exc:
     outcome = type(exc).__name__
     reason = str(exc)[:300]
-result = {"controls": controls, "source": "source-built Jazzy fork",
+result = {"controls": controls, "source": "source-built " + os.environ.get("ROS_DISTRO", "unknown") + " release branch",
           "loaded_libs": paths, "malformed_outcome": outcome,
           "malformed_error": reason, "input_size": len(wire),
           "declared_float64_count": n, "virtual_memory_limit": cap}
