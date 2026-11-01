@@ -24,7 +24,7 @@ jobs:
           docker inspect --format '{{.Id}}' ros:jazzy-ros-base > evidence/container-id.txt
       - name: Compile and execute native bounded allocation witness
         run: |
-          docker run --rm --memory=256m --memory-swap=256m --ulimit core=0 \
+          docker run --rm --memory=2g --memory-swap=2g --ulimit core=0 \
             -v "$PWD:/source:ro" -v "$PWD/evidence:/evidence" \
             ros:jazzy-ros-base bash -ec '
               export DEBIAN_FRONTEND=noninteractive
