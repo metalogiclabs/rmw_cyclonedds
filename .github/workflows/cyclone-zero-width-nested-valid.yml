@@ -1,0 +1,79 @@
+name: Cyclone Jazzy valid zero-field nested sequence comparison
+on:
+  push:
+    branches:
+      - research/jazzy-zero-width-nested-valid-control-20261102
+    paths:
+      - .github/workflows/cyclone-zero-width-nested-valid.yml
+      - research_tests/zero_width_nested_valid.py
+      - rmw_cyclonedds_cpp/src/TypeSupport_impl.hpp
+      - rmw_cyclonedds_cpp/src/serdes.hpp
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-valid-control:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record exact research source and container
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/source-commit.txt
+          git rev-parse HEAD:rmw_cyclonedds_cpp/src/TypeSupport_impl.hpp > evidence/typesupport-blob.txt
+          git rev-parse HEAD:rmw_cyclonedds_cpp/src/serdes.hpp > evidence/serdes-blob.txt
+          docker pull ros:jazzy-ros-base
+          docker inspect --format '{{.Id}}' ros:jazzy-ros-base > evidence/container-id.txt
+      - name: Run the same valid serialization against packaged and patched native libraries
+        run: |
+          docker run --rm --memory=2g --memory-swap=2g --ulimit core=0 \
+            -v "$PWD:/source:ro" -v "$PWD/evidence:/evidence" \
+            ros:jazzy-ros-base bash -ec '
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update -qq
+              apt-get install -y -qq g++ cmake ninja-build python3-colcon-common-extensions \
+                ros-jazzy-rmw-cyclonedds-cpp ros-jazzy-test-msgs
+              source /opt/ros/jazzy/setup.bash
+              dpkg-query -W ros-jazzy-rmw-cyclonedds-cpp ros-jazzy-test-msgs ros-jazzy-rclpy \
+                > /evidence/packages.txt
+              sha256sum /opt/ros/jazzy/lib/librmw_cyclonedds_cpp.so \
+                > /evidence/packaged-library.sha256
+              export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+              export EXPECTED_LIB_DIR=/opt/ros/jazzy/lib
+              set +e
+              /usr/bin/python3 /source/research_tests/zero_width_nested_valid.py \
+                > /evidence/packaged-result.json 2> /evidence/packaged-stderr.txt
+              baseline_rc=$?
+              set -e
+              printf "%s\n" "$baseline_rc" > /evidence/packaged-exit-code.txt
+              cat /evidence/packaged-result.json
+              colcon --log-base /tmp/zero-width-logs build \
+                --merge-install --base-paths /source/rmw_cyclonedds_cpp \
+                --packages-select rmw_cyclonedds_cpp \
+                --build-base /tmp/zero-width-build \
+                --install-base /tmp/zero-width-install \
+                --event-handlers console_cohesion+ \
+                --cmake-args -DBUILD_TESTING=OFF \
+                > /evidence/colcon-build.log 2>&1
+              test -f /tmp/zero-width-install/lib/librmw_cyclonedds_cpp.so
+              sha256sum /tmp/zero-width-install/lib/librmw_cyclonedds_cpp.so \
+                > /evidence/patched-library.sha256
+              export LD_LIBRARY_PATH="/tmp/zero-width-install/lib:$LD_LIBRARY_PATH"
+              export EXPECTED_LIB_DIR=/tmp/zero-width-install/lib
+              set +e
+              /usr/bin/python3 /source/research_tests/zero_width_nested_valid.py \
+                > /evidence/patched-result.json 2> /evidence/patched-stderr.txt
+              patched_rc=$?
+              set -e
+              printf "%s\n" "$patched_rc" > /evidence/patched-exit-code.txt
+              cat /evidence/patched-result.json
+              test "$baseline_rc" -eq 0
+              test "$patched_rc" -eq 0
+            '
+      - name: Preserve comparison even if a legitimate control fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyclone-jazzy-zero-field-valid-comparison
+          path: evidence/
