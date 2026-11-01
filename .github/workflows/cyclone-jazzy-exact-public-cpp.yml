@@ -1,0 +1,36 @@
+name: Cyclone Jazzy exact combined fix public C++ allocation test
+on:
+  push:
+    branches:
+      - research/jazzy-combined-protected-matrix-20261102
+    paths:
+      - .github/workflows/cyclone-jazzy-exact-public-cpp.yml
+      - research_tests/ros_cpp_real_path.cpp
+      - research_tests/ros_cpp_witness/**
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-public-cpp:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pin experiment and container
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/experiment-head.txt
+          docker pull ros:jazzy-ros-base
+          docker inspect --format '{{.Id}}' ros:jazzy-ros-base > evidence/container-id.txt
+      - name: Build real rclcpp C++ witness and source-pinned baseline/candidate RMW
+        run: |
+          docker run --rm --memory=3g --memory-swap=3g --ulimit core=0 \
+            -v "$PWD:/source:ro" -v "$PWD/evidence:/evidence" \
+            ros:jazzy-ros-base bash /source/research_tests/ros_cpp_witness/run_native.sh
+          cat evidence/conclusion.txt
+      - name: Preserve failures and positive controls
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyclone-jazzy-exact-combined-public-cpp
+          path: evidence/
