@@ -155,6 +155,17 @@ public:
     validate_size(sz, el_sz);
     return sz;
   }
+  // A lower bound for variable-size elements, including nested messages,
+  // need not be one of the primitive widths accepted by validate_size().
+  inline uint32_t deserialize_len_minimum(size_t minimum_element_bytes)
+  {
+    assert(minimum_element_bytes > 0);
+    const uint32_t sz = deserialize_len(1);
+    if (sz > (lim - pos) / minimum_element_bytes) {
+      throw DeserializationException("invalid data size");
+    }
+    return sz;
+  }
   inline void deserialize(std::string & x)
   {
     const uint32_t sz = deserialize_len(sizeof(char));
