@@ -62,6 +62,10 @@ jobs:
               printf "colcon_test=%s colcon_test_result=%s\n" "$test_rc" "$result_rc" \
                 > /evidence/exit-codes.txt
               cat /evidence/test-result.txt
+              echo "----- colcon build log (last 100 lines) -----"
+              tail -n 100 /evidence/build.log
+              echo "----- colcon test log (last 200 lines) -----"
+              tail -n 200 /evidence/test.log
               test "$test_rc" -eq 0
               test "$result_rc" -eq 0
             '
