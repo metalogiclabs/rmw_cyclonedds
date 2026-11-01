@@ -1,0 +1,39 @@
+name: Cyclone Jazzy public C++ bounded memory amplification witness
+on:
+  push:
+    branches:
+      - research/jazzy-cdr-memory-amplification-20261102
+    paths:
+      - .github/workflows/cyclone-jazzy-memory-amplification.yml
+      - research_tests/string_amplification.cpp
+      - research_tests/amplification_witness/**
+      - research_tests/check_amplification.py
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pin exact research state
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/experiment-commit.txt
+          git rev-parse HEAD:rmw_cyclonedds_cpp/src/serdes.hpp > evidence/serdes-blob.txt
+          git rev-parse HEAD:rmw_cyclonedds_cpp/src/TypeSupport_impl.hpp > evidence/typesupport-blob.txt
+          docker pull ros:jazzy-ros-base
+          docker inspect --format '{{.Id}}' ros:jazzy-ros-base > evidence/container-id.txt
+      - name: Compare public native baseline and exact candidate under limits
+        run: |
+          docker run --rm --memory=2g --memory-swap=2g --ulimit core=0 \
+            -v "$PWD:/source:ro" -v "$PWD/evidence:/evidence" \
+            ros:jazzy-ros-base bash /source/research_tests/amplification_witness/run_native.sh
+          cat evidence/verdict.txt
+      - name: Save negative and positive evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyclone-jazzy-bounded-memory-amplification
+          path: evidence/
