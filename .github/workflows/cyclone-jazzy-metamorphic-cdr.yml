@@ -1,0 +1,38 @@
+name: Cyclone Jazzy metamorphic CDR valid and malformed differential
+on:
+  push:
+    branches: [research/jazzy-cdr-metamorphic-corpus-20261102]
+    paths:
+      - .github/workflows/cyclone-jazzy-metamorphic-cdr.yml
+      - research_tests/jazzy_metamorphic_cdr.py
+      - research_tests/run_jazzy_metamorphic.sh
+      - research_tests/jazzy_metamorphic_check.py
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-native-differential:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pin run, source blobs, and environment
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/run-commit.txt
+          git rev-parse HEAD:rmw_cyclonedds_cpp/src/TypeSupport_impl.hpp > evidence/typesupport-blob.txt
+          git rev-parse HEAD:rmw_cyclonedds_cpp/src/serdes.hpp > evidence/serdes-blob.txt
+          docker pull ros:jazzy-ros-base
+          docker inspect --format '{{.Id}}' ros:jazzy-ros-base > evidence/container-id.txt
+      - name: Run valid and corrupt CDR corpus under resource caps
+        run: |
+          docker run --rm --memory=2g --memory-swap=2g --ulimit core=0 \
+            -v "$PWD:/source:ro" -v "$PWD/evidence:/evidence" \
+            ros:jazzy-ros-base bash /source/research_tests/run_jazzy_metamorphic.sh
+          cat evidence/verdict.txt
+      - name: Preserve results even if an assertion fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyclone-jazzy-metamorphic-cdr-differential
+          path: evidence/
