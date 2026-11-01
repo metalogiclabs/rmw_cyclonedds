@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>mathgraph_cyclone_allocator_residency</name>
+  <version>0.0.1</version>
+  <description>Source-native bounded Cyclone DDS allocator/residency differential witness</description>
+  <maintainer email="heath@mathgraph.org">Heath Sanchez</maintainer>
+  <license>Apache-2.0</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>rclcpp</depend>
+  <depend>test_msgs</depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>

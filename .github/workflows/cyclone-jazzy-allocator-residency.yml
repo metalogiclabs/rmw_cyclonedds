@@ -1,0 +1,38 @@
+name: Cyclone Jazzy native allocator and resident-memory differential
+on:
+  push:
+    branches: [research/jazzy-cdr-allocator-residency-20261102]
+    paths:
+      - .github/workflows/cyclone-jazzy-allocator-residency.yml
+      - research_tests/jazzy_allocator_residency.cpp
+      - research_tests/jazzy_allocator_residency_check.py
+      - research_tests/run_jazzy_allocator_residency.sh
+      - research_tests/allocator_residency_witness/**
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bounded-native-allocator-residency:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pin source, runner, and container
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/run-commit.txt
+          git rev-parse HEAD:rmw_cyclonedds_cpp/src/TypeSupport_impl.hpp > evidence/typesupport-blob.txt
+          git rev-parse HEAD:rmw_cyclonedds_cpp/src/serdes.hpp > evidence/serdes-blob.txt
+          docker pull ros:jazzy-ros-base
+          docker inspect --format '{{.Id}}' ros:jazzy-ros-base > evidence/container-id.txt
+      - name: Run identical native C++ CDR cases under CPU and memory caps
+        run: |
+          docker run --rm --memory=2g --memory-swap=2g --ulimit core=0 \
+            -v "$PWD:/source:ro" -v "$PWD/evidence:/evidence" \
+            ros:jazzy-ros-base bash /source/research_tests/run_jazzy_allocator_residency.sh
+      - name: Preserve all source and allocator/residency evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyclone-jazzy-allocator-residency
+          path: evidence/
