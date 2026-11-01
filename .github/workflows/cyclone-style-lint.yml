@@ -47,7 +47,7 @@ jobs:
                 --cmake-args -DBUILD_TESTING=ON \
                 > /evidence/build.log 2>&1
               set +e
-              colcon --log-base /tmp/lint-test-logs test \
+              colcon --log-base /tmp/lint-test-logs test --merge-install \
                 --packages-select rmw_cyclonedds_cpp \
                 --build-base /tmp/lint-build \
                 --install-base /tmp/lint-install \
