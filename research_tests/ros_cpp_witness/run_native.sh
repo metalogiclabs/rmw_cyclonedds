@@ -34,7 +34,7 @@ sha256sum "$app" > /evidence/cpp-probe-binary.sha256
 
 build_rmw() {
  local arm="$1"
- colcon --log-base "/tmp/cyclone-logs-$arm" build \
+ colcon --log-base "/tmp/cyclone-logs-$arm" build --merge-install \
    --base-paths "$src/rmw_cyclonedds_cpp" \
    --packages-select rmw_cyclonedds_cpp \
    --build-base "/tmp/cyclone-build-$arm" \
