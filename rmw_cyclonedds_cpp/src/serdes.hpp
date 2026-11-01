@@ -224,7 +224,13 @@ public:
   template<class T>
   inline void deserialize(std::vector<T> & x)
   {
-    const uint32_t sz = deserialize_len(1);
+    // Reject impossible element counts before the destination vector grows.
+    // Scalar values require their full wire width; strings require at least
+    // a four-byte length field. Preserve the general minimum for other types.
+    const size_t min_wire_size = std::is_arithmetic<T>::value ? sizeof(T) :
+      (std::is_same<T, std::string>::value || std::is_same<T, std::wstring>::value ?
+      sizeof(uint32_t) : 1);
+    const uint32_t sz = deserialize_len(min_wire_size);
     x.resize(sz);
     deserializeA(x.data(), sz);
   }
