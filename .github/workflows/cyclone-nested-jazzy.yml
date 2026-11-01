@@ -1,0 +1,63 @@
+name: Cyclone Jazzy nested CDR sequence preflight
+on:
+  push:
+    branches:
+      - research/jazzy-cdr-nested-minwire-20261102
+    paths:
+      - .github/workflows/cyclone-nested-jazzy.yml
+      - rmw_cyclonedds_cpp/src/TypeSupport_impl.hpp
+      - research_tests/nested_sequence_preflight.py
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record source and ROS environment
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/commit.txt
+          git rev-parse HEAD:rmw_cyclonedds_cpp/src/TypeSupport_impl.hpp > evidence/typesupport-blob.txt
+          docker pull ros:jazzy-ros-base
+          docker inspect --format '{{.Id}}' ros:jazzy-ros-base > evidence/container-id.txt
+      - name: Compile actual Jazzy RMW and exercise bounded nested-sequence case
+        run: |
+          docker run --rm --memory=2g --memory-swap=2g --ulimit core=0 \
+            -v "$PWD:/source:ro" -v "$PWD/evidence:/evidence" \
+            ros:jazzy-ros-base bash -ec '
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update -qq
+              apt-get install -y -qq g++ cmake ninja-build python3-colcon-common-extensions \
+                ros-jazzy-rmw-cyclonedds-cpp ros-jazzy-test-msgs
+              set +u
+              source /opt/ros/jazzy/setup.bash
+              set -u
+              dpkg-query -W ros-jazzy-rmw-cyclonedds-cpp ros-jazzy-test-msgs ros-jazzy-rclpy \
+                > /evidence/packages.txt
+              colcon --log-base /tmp/nested-logs build \
+                --merge-install --base-paths /source/rmw_cyclonedds_cpp \
+                --packages-select rmw_cyclonedds_cpp \
+                --build-base /tmp/nested-build \
+                --install-base /tmp/nested-install \
+                --event-handlers console_cohesion+ \
+                --cmake-args -DBUILD_TESTING=OFF \
+                > /evidence/colcon-build.log 2>&1
+              test -f /tmp/nested-install/lib/librmw_cyclonedds_cpp.so
+              sha256sum /tmp/nested-install/lib/librmw_cyclonedds_cpp.so > /evidence/library.sha256
+              export LD_LIBRARY_PATH="/tmp/nested-install/lib:$LD_LIBRARY_PATH"
+              export EXPECTED_LIB_DIR=/tmp/nested-install/lib
+              export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+              ulimit -t 30
+              /usr/bin/python3 /source/research_tests/nested_sequence_preflight.py \
+                > /evidence/result.json 2> /evidence/stderr.txt
+              cat /evidence/result.json
+            '
+      - name: Preserve outcome, including failed assertions
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyclone-jazzy-nested-preflight
+          path: evidence/
