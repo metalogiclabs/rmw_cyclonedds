@@ -14,7 +14,7 @@ dpkg-query -W ros-jazzy-rmw-cyclonedds-cpp ros-jazzy-test-msgs ros-jazzy-rclpy \
 BASE_SHA="20b192ae744f2fe56767e68081a46ad0d7f7a0ec"
 CANDIDATE_SHA="bfa40e6e09344b8ddda622956195f3132191d8b2"
 PR625_SHA="73c2fb62b2be3b752b098f44cc6c41b9c4bbe85a"
-git clone -q /source /tmp/cyclone-base
+git clone -q https://github.com/metalogiclabs/rmw_cyclonedds.git /tmp/cyclone-base
 git -C /tmp/cyclone-base fetch -q https://github.com/ros2/rmw_cyclonedds.git pull/625/head
 test "$(git -C /tmp/cyclone-base rev-parse FETCH_HEAD)" = "$PR625_SHA"
 git -C /tmp/cyclone-base show --format= FETCH_HEAD -- \
@@ -28,7 +28,7 @@ for arm in baseline candidate; do
     src=/tmp/cyclone-base
     sha="$BASE_SHA"
   else
-    git clone -q /source "$src"
+    git clone -q https://github.com/metalogiclabs/rmw_cyclonedds.git "$src"
     sha="$CANDIDATE_SHA"
   fi
   git -C "$src" checkout -q --detach "$sha"
