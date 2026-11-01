@@ -6,13 +6,21 @@ import resource
 import struct
 
 from rclpy.serialization import deserialize_message, serialize_message
-from test_msgs.msg import BasicTypes, UnboundedSequences
+from test_msgs.msg import BasicTypes, Constants, Defaults, UnboundedSequences
 
-# Positive controls: the sequence must retain its normal wire semantics.
-for count in (0, 1, 2):
-    message = UnboundedSequences(basic_types_values=[BasicTypes()] * count)
+# Positive controls include a zero-member nested message (Constants),
+# non-empty primitive-only nested messages, and default-valued messages.
+cases = [
+    ("empty", {"basic_types_values": []}, "basic_types_values", 0),
+    ("one_basic", {"basic_types_values": [BasicTypes()]}, "basic_types_values", 1),
+    ("two_basic", {"basic_types_values": [BasicTypes(), BasicTypes()]}, "basic_types_values", 2),
+    ("empty_member_type", {"constants_values": [Constants(), Constants()]}, "constants_values", 2),
+    ("defaults", {"defaults_values": [Defaults()]}, "defaults_values", 1),
+]
+for label, fields, name, count in cases:
+    message = UnboundedSequences(**fields)
     roundtrip = deserialize_message(serialize_message(message), UnboundedSequences)
-    assert len(roundtrip.basic_types_values) == count
+    assert len(getattr(roundtrip, name)) == count, label
 
 paths = sorted({line.split()[-1] for line in open("/proc/self/maps")
                 if "librmw_cyclonedds_cpp.so" in line and "/" in line})
@@ -38,7 +46,7 @@ except Exception as exc:
     outcome = type(exc).__name__
     reason = str(exc)[:400]
 result = {"input_bytes": len(wire), "declared_nested_elements": count,
-          "positive_controls": "3/3 passed", "source_libs": paths,
+          "positive_controls": "5/5 passed", "source_libs": paths,
           "virtual_memory_limit": cap, "outcome": outcome, "reason": reason}
 print(json.dumps(result, sort_keys=True), flush=True)
 assert outcome in ("RMWError", "RuntimeError"), result
