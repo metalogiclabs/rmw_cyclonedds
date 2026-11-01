@@ -24,9 +24,13 @@ jobs:
           docker inspect --format '{{.Id}}' ros:jazzy-ros-base > evidence/container-id.txt
       - name: Compile and execute native bounded allocation witness
         run: |
-          docker run --rm --network=none --memory=256m --memory-swap=256m --ulimit core=0 \
+          docker run --rm --memory=256m --memory-swap=256m --ulimit core=0 \
             -v "$PWD:/source:ro" -v "$PWD/evidence:/evidence" \
             ros:jazzy-ros-base bash -ec '
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update -qq
+              apt-get install -y -qq g++ ros-jazzy-cyclonedds
+              dpkg-query -W ros-jazzy-cyclonedds > /evidence/cyclonedds-version.txt
               src=/source/rmw_cyclonedds_cpp/src
               header=$(find /opt/ros/jazzy/include -path "*/dds/ddsrt/endian.h" -print -quit)
               test -n "$header"
