@@ -1,0 +1,49 @@
+name: Bounded Cyclone CDR C++ sequence allocation probe
+on:
+  push:
+    branches:
+      - research/jazzy-cdr-allocation-boundary-20261102
+    paths:
+      - .github/workflows/cyclone-cpp-sequence-allocation.yml
+      - research_tests/sequence_allocation_probe.cpp
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Capture experiment and ROS image
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/experiment-commit.txt
+          git rev-parse HEAD:rmw_cyclonedds_cpp/src/serdes.hpp > evidence/serdes-header-blob.txt
+          docker pull ros:jazzy-ros-base
+          docker inspect --format '{{.Id}}' ros:jazzy-ros-base > evidence/container-id.txt
+      - name: Compile and execute native bounded allocation witness
+        run: |
+          docker run --rm --network=none --memory=256m --memory-swap=256m --ulimit core=0 \
+            -v "$PWD:/source:ro" -v "$PWD/evidence:/evidence" \
+            ros:jazzy-ros-base bash -ec '
+              src=/source/rmw_cyclonedds_cpp/src
+              header=$(find /opt/ros/jazzy/include -path "*/dds/ddsrt/endian.h" -print -quit)
+              test -n "$header"
+              include=$(dirname "$(dirname "$(dirname "$header")")")
+              printf "header=%s\ninclude=%s\n" "$header" "$include" > /evidence/include-path.txt
+              g++ -std=c++17 -O0 -I"$src" -I"$include" \
+                /source/research_tests/sequence_allocation_probe.cpp \
+                "$src/serdes.cpp" "$src/exception.cpp" "$src/deserialization_exception.cpp" \
+                -o /evidence/sequence_allocation_probe
+              sha256sum /evidence/sequence_allocation_probe > /evidence/binary.sha256
+              ulimit -v 200000
+              /evidence/sequence_allocation_probe > /evidence/native-output.txt 2>&1
+              cat /evidence/native-output.txt
+            '
+      - name: Preserve output even if build or test fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyclone-cpp-allocator-boundary
+          path: evidence/
