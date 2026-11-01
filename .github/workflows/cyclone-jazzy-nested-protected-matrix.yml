@@ -29,7 +29,7 @@ jobs:
         run: |
           docker run --rm --memory=2g --memory-swap=2g --ulimit core=0 \
             -v "$PWD:/source:ro" -v "$PWD/evidence:/evidence" \
-            ros:jazzy-ros-base bash /source/research_tests/run_protected_combined.sh
+            ros:jazzy-ros-base bash /source/research_tests/run_protected_nested_combined.sh
           cat evidence/verdict.txt
       - name: Preserve negative evidence as well as success
         if: always()
