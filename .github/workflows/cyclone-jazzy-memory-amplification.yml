@@ -1,8 +1,8 @@
-name: Cyclone Jazzy public C++ bounded memory amplification witness
+name: Cyclone Jazzy valid versus truncated C++ allocation control
 on:
   push:
     branches:
-      - research/jazzy-cdr-memory-amplification-20261102
+      - research/jazzy-cdr-valid-vs-truncated-allocation-20261102
     paths:
       - .github/workflows/cyclone-jazzy-memory-amplification.yml
       - research_tests/string_amplification.cpp
