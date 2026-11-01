@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Protected native, source-identical combined C/C++ preflight comparison.
 set -euo pipefail
+git config --global --add safe.directory /source
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y -qq git cmake ninja-build g++ curl python3-colcon-common-extensions \
