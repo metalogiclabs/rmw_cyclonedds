@@ -1,0 +1,39 @@
+name: Cyclone Jazzy protected full-matrix nested sequence preflight
+on:
+  push:
+    branches:
+      - research/jazzy-cdr-nested-minwire-20261102
+    paths:
+      - .github/workflows/cyclone-jazzy-nested-protected-matrix.yml
+      - research_tests/run_protected_nested_combined.sh
+      - research_tests/check_protected_nested_combined.py
+      - research_tests/combined_native_smoke.py
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  protected-native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record exact source and container
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/experiment-commit.txt
+          git rev-parse HEAD:rmw_cyclonedds_cpp/src/serdes.hpp > evidence/serdes-blob.txt
+          git rev-parse HEAD:rmw_cyclonedds_cpp/src/TypeSupport_impl.hpp > evidence/typesupport-blob.txt
+          docker pull ros:jazzy-ros-base
+          docker inspect --format '{{.Id}}' ros:jazzy-ros-base > evidence/container-id.txt
+      - name: Build two source-pinned middleware libraries and compare all tests
+        run: |
+          docker run --rm --memory=2g --memory-swap=2g --ulimit core=0 \
+            -v "$PWD:/source:ro" -v "$PWD/evidence:/evidence" \
+            ros:jazzy-ros-base bash /source/research_tests/run_protected_combined.sh
+          cat evidence/verdict.txt
+      - name: Preserve negative evidence as well as success
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyclone-jazzy-nested-protected-full-matrix
+          path: evidence/
