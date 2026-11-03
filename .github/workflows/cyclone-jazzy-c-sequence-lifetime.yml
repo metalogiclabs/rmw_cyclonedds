@@ -5,6 +5,7 @@ on:
     paths:
       - .github/workflows/cyclone-jazzy-c-sequence-lifetime.yml
       - research_tests/jazzy_c_sequence_leak.py
+      - research_tests/jazzy_c_sequence_protected.py
       - research_tests/run_jazzy_c_sequence_lifetime.sh
       - rmw_cyclonedds_cpp/src/TypeSupport_impl.hpp
   workflow_dispatch:

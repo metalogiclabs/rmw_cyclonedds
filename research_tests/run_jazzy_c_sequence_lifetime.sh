@@ -22,6 +22,7 @@ git -C /source rev-parse HEAD > /evidence/runner-commit.txt
 git -C /source rev-parse HEAD:rmw_cyclonedds_cpp/src/TypeSupport_impl.hpp \
   > /evidence/source-typesupport-blob.txt
 sha256sum /source/research_tests/jazzy_c_sequence_leak.py \
+  /source/research_tests/jazzy_c_sequence_protected.py \
   /source/research_tests/run_jazzy_c_sequence_lifetime.sh \
   > /evidence/harness.sha256
 
@@ -61,3 +62,9 @@ python3 /source/research_tests/jazzy_c_sequence_leak.py --arm source --count 200
     exit 1
   }
 tail -n 30 /evidence/sequence-output.txt
+python3 /source/research_tests/jazzy_c_sequence_protected.py \
+  > /evidence/protected-output.txt 2>&1 || {
+    tail -n 30 /evidence/protected-output.txt
+    exit 1
+  }
+tail -n 5 /evidence/protected-output.txt
