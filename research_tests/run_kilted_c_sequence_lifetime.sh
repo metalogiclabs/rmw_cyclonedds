@@ -53,7 +53,7 @@ colcon --log-base /tmp/kilted-logs build --merge-install \
   }
 
 colcon --log-base /tmp/kilted-test-logs test \
-  --packages-select rmw_cyclonedds_cpp --build-base /tmp/kilted-build \
+  --merge-install --packages-select rmw_cyclonedds_cpp --build-base /tmp/kilted-build \
   --install-base /tmp/kilted-install --event-handlers console_cohesion+ \
   > /evidence/kilted-test.log 2>&1 || {
     tail -n 100 /evidence/kilted-test.log
