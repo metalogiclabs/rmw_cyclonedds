@@ -16,6 +16,8 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Pin source and Docker image
         run: |
           mkdir -p evidence
