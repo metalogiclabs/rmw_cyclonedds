@@ -112,10 +112,11 @@ def child(kind, value):
     }, sort_keys=True), flush=True)
 
 
-def parent():
+def parent(include_count, arm):
     cases = [("valid", name) for name in VALID_NAMES]
     cases += [("short", f"{name}:{size}") for name in SHORT_TYPES for size in range(4)]
-    cases += [("count", "inflated_131072")]
+    if include_count:
+        cases += [("count", "inflated_131072")]
     rows = []
     for kind, value in cases:
         command = [sys.executable, __file__, "--child", kind, "--value", value]
@@ -137,7 +138,8 @@ def parent():
         rows.append(row)
         print(json.dumps(row, sort_keys=True), flush=True)
 
-    Path("/evidence/protected-results.json").write_text(json.dumps(rows, indent=2) + "\n")
+    Path(f"/evidence/{arm}-protected-results.json").write_text(
+        json.dumps(rows, indent=2) + "\n")
     failures = [row for row in rows if row["outcome"] != "pass"]
     if failures:
         raise SystemExit(f"FAIL: {len(failures)} of {len(rows)} protected controls")
@@ -148,8 +150,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--child", choices=("valid", "short", "count"))
     parser.add_argument("--value")
+    parser.add_argument("--skip-count", action="store_true")
+    parser.add_argument("--arm", default="source")
     args = parser.parse_args()
     if args.child:
         child(args.child, args.value)
     else:
-        parent()
+        parent(include_count=not args.skip_count, arm=args.arm)
