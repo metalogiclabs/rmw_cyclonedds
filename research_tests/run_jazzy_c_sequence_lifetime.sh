@@ -15,6 +15,8 @@ dpkg-query -W ros-jazzy-rclpy ros-jazzy-test-msgs ros-jazzy-rmw-cyclonedds-cpp \
 
 PR625=73c2fb62b2be3b752b098f44cc6c41b9c4bbe85a
 BASE629=96db6375b3b9b0c80481fa445f2d1f393e74c955
+JAZZY629=fddab142fbef448ed6b2ceeaf4c1e9b1d95bae6d
+JAZZY_TYPESUPPORT=9556cd8e3a6c38a1669fbcfed1ec5a3325c874e2
 git -C /source merge-base --is-ancestor "$BASE629" HEAD
 git -C /source rev-parse HEAD > /evidence/runner-commit.txt
 git -C /source rev-parse HEAD:rmw_cyclonedds_cpp/src/TypeSupport_impl.hpp \
@@ -23,7 +25,14 @@ sha256sum /source/research_tests/jazzy_c_sequence_leak.py \
   /source/research_tests/run_jazzy_c_sequence_lifetime.sh \
   > /evidence/harness.sha256
 
-git clone -q /source /tmp/rmw-lifetime
+git clone -q -b jazzy https://github.com/metalogiclabs/rmw_cyclonedds /tmp/rmw-lifetime
+git -C /tmp/rmw-lifetime checkout -q --detach "$JAZZY629"
+test "$(git -C /tmp/rmw-lifetime rev-parse HEAD:rmw_cyclonedds_cpp/src/TypeSupport_impl.hpp)" = "$JAZZY_TYPESUPPORT"
+test "$(git -C /source rev-parse "$BASE629":rmw_cyclonedds_cpp/src/TypeSupport_impl.hpp)" = "$JAZZY_TYPESUPPORT"
+cp /source/rmw_cyclonedds_cpp/src/TypeSupport_impl.hpp \
+  /tmp/rmw-lifetime/rmw_cyclonedds_cpp/src/TypeSupport_impl.hpp
+git -C /tmp/rmw-lifetime diff -- rmw_cyclonedds_cpp/src/TypeSupport_impl.hpp \
+  > /evidence/c-sequence-change.patch
 git -C /tmp/rmw-lifetime fetch -q https://github.com/ros2/rmw_cyclonedds pull/625/head
 test "$(git -C /tmp/rmw-lifetime rev-parse FETCH_HEAD)" = "$PR625"
 git -C /tmp/rmw-lifetime show --format= FETCH_HEAD -- rmw_cyclonedds_cpp/src/serdes.cpp \
