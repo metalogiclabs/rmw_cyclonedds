@@ -8,6 +8,7 @@ on:
       - research_tests/jazzy_c_sequence_protected.py
       - research_tests/c-sequence-lifetime-only.patch
       - research_tests/run_jazzy_c_sequence_lifetime.sh
+      - research_tests/run_kilted_c_sequence_lifetime.sh
       - rmw_cyclonedds_cpp/src/TypeSupport_impl.hpp
   workflow_dispatch:
 permissions:
@@ -37,4 +38,28 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cyclone-jazzy-c-sequence-lifetime
+          path: evidence/
+  kilted-native-source-and-package-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Pin source and Kilted container image
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/run-commit.txt
+          docker pull ros:kilted-ros-base
+          docker inspect --format '{{.Id}}' ros:kilted-ros-base > evidence/container-id.txt
+      - name: Build with testing and run native source regression
+        run: |
+          docker run --rm --memory=2g --memory-swap=2g --ulimit core=0 \
+            -v "$PWD:/source:ro" -v "$PWD/evidence:/evidence" \
+            ros:kilted-ros-base bash /source/research_tests/run_kilted_c_sequence_lifetime.sh
+      - name: Preserve Kilted build, package-test and memory evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyclone-kilted-c-sequence-lifetime
           path: evidence/
