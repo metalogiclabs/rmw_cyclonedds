@@ -2,6 +2,7 @@
 # Exercise a source-built Jazzy C introspection deserializer with fixed #625.
 set -euo pipefail
 git config --global --add safe.directory /source
+git config --global --add safe.directory /source/.git
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y -qq git g++ cmake ninja-build python3-colcon-common-extensions \
