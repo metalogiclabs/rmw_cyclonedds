@@ -95,6 +95,7 @@ def child(kind, value):
             assert struct.unpack_from("<I", wire, offset)[0] == 0
             wire = wire[:offset + 4]
             struct.pack_into("<I", wire, offset, 131072)
+            wire = bytes(wire)
         else:
             raise ValueError(kind)
         try:
