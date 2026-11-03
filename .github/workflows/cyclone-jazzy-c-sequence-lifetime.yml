@@ -1,0 +1,36 @@
+name: Cyclone Jazzy C sequence lifetime regression
+on:
+  push:
+    branches: [research/jazzy-c-sequence-lifetime-20261104]
+    paths:
+      - .github/workflows/cyclone-jazzy-c-sequence-lifetime.yml
+      - research_tests/jazzy_c_sequence_leak.py
+      - research_tests/run_jazzy_c_sequence_lifetime.sh
+      - rmw_cyclonedds_cpp/src/TypeSupport_impl.hpp
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  finite-native-c-typesupport:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pin source and Docker image
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/run-commit.txt
+          git rev-parse HEAD:rmw_cyclonedds_cpp/src/TypeSupport_impl.hpp > evidence/typesupport-blob.txt
+          docker pull ros:jazzy-ros-base
+          docker inspect --format '{{.Id}}' ros:jazzy-ros-base > evidence/container-id.txt
+      - name: Build and exercise capped C sequence lifetime regression
+        run: |
+          docker run --rm --memory=2g --memory-swap=2g --ulimit core=0 \
+            -v "$PWD:/source:ro" -v "$PWD/evidence:/evidence" \
+            ros:jazzy-ros-base bash /source/research_tests/run_jazzy_c_sequence_lifetime.sh
+      - name: Preserve source and per-type memory-growth evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyclone-jazzy-c-sequence-lifetime
+          path: evidence/
