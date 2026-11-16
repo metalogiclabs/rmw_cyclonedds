@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rebuild the exact clean upstream-facing Kilted patch with tests enabled.
+# Rebuild the combined #629 preflight and #634 lifetime repair with tests enabled.
 # This is a qualification harness only; it does not alter the source-only PR.
 set -euo pipefail
 
@@ -18,21 +18,24 @@ dpkg-query -W ros-kilted-rclpy ros-kilted-test-msgs \
   ros-kilted-rmw-cyclonedds-cpp ros-kilted-ament-lint-auto \
   > /evidence/kilted-packages.txt
 
-UPSTREAM_KILTED=2c56f9b3feb3ed1e359a7ea852f2c7331ad41992
-SOURCE_COMMIT=6234fd72b900a3a04e0917e0c6202ccc2d743818
-SOURCE_BLOB=caaab0623f9c214ad7922fe1b71cd691bdd413f3
+UPSTREAM_KILTED=5530efc58dc1c4426ecdeeb54ff5328178217a63
+SOURCE_COMMIT=702c3ced111d1ca019007dcdb07dade0487994a2
+SOURCE_BLOB=f7c5cd9e3753c828200b849fc43fbaabc4276dd1
+SERDES_BLOB=b3be1fcb5385a97f37f8003a6f642f8f23d38716
 HEADER_PR=73c2fb62b2be3b752b098f44cc6c41b9c4bbe85a
 SOURCE_PATH=rmw_cyclonedds_cpp/src/TypeSupport_impl.hpp
+SERDES_PATH=rmw_cyclonedds_cpp/src/serdes.hpp
 
-git clone -q -b contrib/kilted-c-sequence-lifetime-20261104 \
+git clone -q -b research/kilted-preflight-634-candidate-20261116 \
   https://github.com/metalogiclabs/rmw_cyclonedds /tmp/rmw-kilted-lifetime
 git -C /tmp/rmw-kilted-lifetime checkout -q --detach "$SOURCE_COMMIT"
-test "$(git -C /tmp/rmw-kilted-lifetime rev-parse HEAD^1)" = "$UPSTREAM_KILTED"
+test "$(git -C /tmp/rmw-kilted-lifetime rev-parse HEAD^2)" = "$UPSTREAM_KILTED"
 test "$(git -C /tmp/rmw-kilted-lifetime rev-parse HEAD:"$SOURCE_PATH")" = "$SOURCE_BLOB"
-test "$(git -C /tmp/rmw-kilted-lifetime diff --name-only "$UPSTREAM_KILTED" "$SOURCE_COMMIT")" = "$SOURCE_PATH"
+test "$(git -C /tmp/rmw-kilted-lifetime rev-parse HEAD:"$SERDES_PATH")" = "$SERDES_BLOB"
+test "$(git -C /tmp/rmw-kilted-lifetime diff --name-only "$UPSTREAM_KILTED" "$SOURCE_COMMIT")" = "$(printf '%s\n%s' "$SOURCE_PATH" "$SERDES_PATH")"
 git -C /tmp/rmw-kilted-lifetime show --format= --stat HEAD > /evidence/kilted-source-stat.txt
 git -C /tmp/rmw-kilted-lifetime diff "$UPSTREAM_KILTED" "$SOURCE_COMMIT" \
-  -- "$SOURCE_PATH" > /evidence/kilted-lifetime-only.patch
+  -- "$SOURCE_PATH" "$SERDES_PATH" > /evidence/kilted-combined.patch
 git -C /tmp/rmw-kilted-lifetime fetch -q \
   https://github.com/ros2/rmw_cyclonedds pull/625/head
 test "$(git -C /tmp/rmw-kilted-lifetime rev-parse FETCH_HEAD)" = "$HEADER_PR"
@@ -80,7 +83,7 @@ python3 /source/research_tests/jazzy_c_sequence_leak.py \
   }
 tail -n 8 /evidence/kilted-sequence-output.txt
 python3 /source/research_tests/jazzy_c_sequence_protected.py \
-  --arm kilted --skip-count > /evidence/kilted-protected-output.txt 2>&1 || {
+  --arm kilted > /evidence/kilted-protected-output.txt 2>&1 || {
     tail -n 100 /evidence/kilted-protected-output.txt
     exit 1
   }
